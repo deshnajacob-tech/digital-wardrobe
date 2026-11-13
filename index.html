@@ -19,8 +19,36 @@
       <h1 id="view-title">Wardrobe</h1>
       <p id="view-sub" class="muted"></p>
     </div>
-    <div class="brand" aria-hidden="true">closet<span>.</span></div>
+    <button class="me" id="me-btn" hidden title="Your profile">
+      <span class="me-face" id="me-face"></span><span id="me-name"></span>
+    </button>
   </header>
+
+  <!-- SIGN IN / PROFILES -->
+  <div id="welcome" class="welcome" hidden>
+    <div class="welcome-card">
+      <div class="brand big">closet<span>.</span></div>
+
+      <div id="welcome-list">
+        <h2>Who’s getting dressed?</h2>
+        <div class="profile-list" id="profile-list"></div>
+        <button class="btn block" id="welcome-new">＋ New profile</button>
+      </div>
+
+      <form id="welcome-form" novalidate>
+        <h2>Create your profile</h2>
+        <p class="muted">Your wardrobe and looks are saved privately to this profile.</p>
+        <label class="field"><span>Your name</span>
+          <input id="welcome-name" class="input" maxlength="24" autocomplete="given-name" placeholder="e.g. Sam">
+        </label>
+        <div class="field"><span>I am a…</span>
+          <div class="gender-pick" id="welcome-gender" role="radiogroup" aria-label="Gender"></div>
+        </div>
+        <button class="btn primary block" type="submit">Get started</button>
+        <button class="btn ghost block" type="button" id="welcome-back">Back</button>
+      </form>
+    </div>
+  </div>
 
   <main>
     <!-- WARDROBE -->

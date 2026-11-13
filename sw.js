@@ -1,5 +1,5 @@
 /* Offline support: network-first, falling back to cache. */
-const CACHE = 'closet-v1';
+const CACHE = 'closet-v2';
 const ASSETS = [
   './', 'index.html', 'css/styles.css',
   'js/config.js', 'js/db.js', 'js/avatar.js', 'js/editor.js', 'js/stage.js', 'js/app.js',

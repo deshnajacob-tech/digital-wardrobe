@@ -1,10 +1,18 @@
-/* App shell: views, wardrobe, outfits, avatar settings. */
+/* App shell: profiles / sign-in, views, wardrobe, outfits, avatar settings. */
 const App = (() => {
   const VIEWS = ['wardrobe', 'dressup', 'outfits', 'avatar'];
-  const S = { items: [], byId: new Map(), outfits: [], avatar: null, filter: 'all', drawer: 'all', view: 'wardrobe' };
+  const S = {
+    profiles: [], profile: null,
+    items: [], byId: new Map(), outfits: [], avatar: { ...Avatar.DEFAULT },
+    filter: 'all', drawer: 'all', view: 'wardrobe',
+  };
+  const pkey = (k, p = S.profile) => `${k}:${p.id}`;
 
-  const saveCurrent = debounce(() => DB.put('settings', Stage.getLayers(), 'current').catch(console.error), 400);
-  const saveAvatar = debounce(() => DB.put('settings', S.avatar, 'avatar').catch(console.error), 300);
+  // Debounced writes capture the profile key at call time, so switching profiles can't misfile data.
+  const putSoonA = debounce((k, v) => DB.put('settings', v, k).catch(console.error), 300);
+  const putSoonB = debounce((k, v) => DB.put('settings', v, k).catch(console.error), 400);
+  const saveAvatar = () => { if (S.profile) putSoonA(pkey('avatar'), { ...S.avatar }); };
+  const saveCurrent = () => { if (S.profile) putSoonB(pkey('current'), Stage.getLayers()); };
 
   async function start() {
     Editor.init();
@@ -13,31 +21,19 @@ const App = (() => {
       onChange: () => { saveCurrent(); if (S.view === 'dressup') renderDrawer(); },
     });
     wire();
-    S.avatar = { ...Avatar.DEFAULT };
     Stage.setAvatar(S.avatar);
-    buildAvatarEditor();
-    const v = location.hash.slice(1);
-    show(VIEWS.includes(v) ? v : 'wardrobe');
 
-    let items = [], outfits = [], avatar = null, current = null;
+    let profiles = [], active = null;
     try {
-      [items, outfits, avatar, current] = await Promise.all([
-        DB.all('items'), DB.all('outfits'), DB.get('settings', 'avatar'), DB.get('settings', 'current'),
-      ]);
+      [profiles, active] = await Promise.all([DB.get('settings', 'profiles'), DB.get('settings', 'activeProfile')]);
     } catch (e) {
       console.error(e);
-      toast('Storage is unavailable – items won’t be saved');
+      toast('Storage is unavailable – nothing will be saved');
     }
-    S.items = items.sort((a, b) => b.createdAt - a.createdAt).map(hydrate);
-    S.outfits = outfits.sort((a, b) => b.createdAt - a.createdAt).map(o => ({ ...o, url: URL.createObjectURL(o.thumb) }));
-    S.avatar = Object.assign({}, Avatar.DEFAULT, avatar || {});
-
-    Stage.setAvatar(S.avatar);
-    Stage.setLayers(current || []);
-    buildAvatarEditor();
-    renderWardrobe();
-    renderOutfits();
-    show(S.view);
+    S.profiles = profiles || [];
+    const p = S.profiles.find(x => x.id === active);
+    if (p) await signIn(p);
+    else showWelcome();
 
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
     if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -53,6 +49,140 @@ const App = (() => {
     return it;
   }
   const record = ({ url, img, ...rest }) => rest;
+
+  /* ---------- profiles ---------- */
+  async function signIn(p) {
+    S.items.forEach(i => URL.revokeObjectURL(i.url));
+    S.outfits.forEach(o => URL.revokeObjectURL(o.url));
+    S.byId.clear();
+    S.profile = p;
+    DB.put('settings', p.id, 'activeProfile').catch(console.error);
+
+    let items = [], outfits = [], avatar = null, current = null;
+    try {
+      [items, outfits, avatar, current] = await Promise.all([
+        DB.all('items'), DB.all('outfits'), DB.get('settings', pkey('avatar')), DB.get('settings', pkey('current')),
+      ]);
+    } catch (e) { console.error(e); }
+    S.items = items.filter(i => i.profileId === p.id).sort((a, b) => b.createdAt - a.createdAt).map(hydrate);
+    S.outfits = outfits.filter(o => o.profileId === p.id).sort((a, b) => b.createdAt - a.createdAt)
+      .map(o => ({ ...o, url: URL.createObjectURL(o.thumb) }));
+    S.avatar = Object.assign(Avatar.defaultsFor(p.gender), avatar || {});
+    S.filter = S.drawer = 'all';
+
+    Stage.setAvatar(S.avatar);
+    Stage.setLayers(current || []);
+    hideWelcome();
+    updateMe();
+    buildAvatarEditor();
+    renderWardrobe();
+    renderOutfits();
+    const v = location.hash.slice(1);
+    show(VIEWS.includes(v) ? v : 'wardrobe');
+  }
+
+  async function createProfile(name, gender) {
+    const p = { id: uid(), name, gender, createdAt: Date.now() };
+    const first = S.profiles.length === 0;
+    S.profiles.push(p);
+    try {
+      await DB.put('settings', S.profiles, 'profiles');
+      await DB.put('settings', Avatar.defaultsFor(gender), pkey('avatar', p));
+      if (first) await claimOrphans(p);
+    } catch (e) { console.error(e); }
+    await signIn(p);
+    toast(`Welcome, ${name}!`);
+  }
+
+  // Items saved before profiles existed belong to the first profile created.
+  async function claimOrphans(p) {
+    const [items, outfits, cur] = await Promise.all([DB.all('items'), DB.all('outfits'), DB.get('settings', 'current')]);
+    for (const i of items) if (!i.profileId) { i.profileId = p.id; await DB.put('items', i); }
+    for (const o of outfits) if (!o.profileId) { o.profileId = p.id; await DB.put('outfits', o); }
+    if (cur) await DB.put('settings', cur, pkey('current', p));
+  }
+
+  function switchProfile() {
+    S.profile = null;
+    DB.put('settings', null, 'activeProfile').catch(console.error);
+    showWelcome();
+  }
+
+  async function deleteProfile() {
+    const p = S.profile;
+    if (!(await confirmDialog(`Delete ${p.name}’s profile?`, 'All clothes and saved looks in this profile will be permanently removed from this device.'))) return;
+    try {
+      for (const i of S.items) await DB.del('items', i.id);
+      for (const o of S.outfits) await DB.del('outfits', o.id);
+      await DB.del('settings', pkey('avatar'));
+      await DB.del('settings', pkey('current'));
+      S.profiles = S.profiles.filter(x => x.id !== p.id);
+      await DB.put('settings', S.profiles, 'profiles');
+    } catch (e) { console.error(e); }
+    S.items.forEach(i => URL.revokeObjectURL(i.url));
+    S.outfits.forEach(o => URL.revokeObjectURL(o.url));
+    S.items = []; S.outfits = []; S.byId.clear();
+    Stage.setLayers([]);
+    switchProfile();
+    toast('Profile deleted');
+  }
+
+  function updateMe() {
+    const b = $('#me-btn');
+    b.hidden = !S.profile;
+    if (!S.profile) return;
+    $('#me-name').textContent = S.profile.name;
+    $('#me-face').innerHTML = Avatar.svg(S.avatar, '104 22 92 92');
+  }
+
+  /* ---------- welcome screen ---------- */
+  let pickedGender = null;
+
+  function showWelcome(mode) {
+    const create = mode === 'create' || S.profiles.length === 0;
+    $('#welcome').hidden = false;
+    $('#me-btn').hidden = true;
+    document.body.classList.add('modal-open');
+    $('#welcome-list').hidden = create;
+    $('#welcome-form').hidden = !create;
+    $('#welcome-back').hidden = S.profiles.length === 0;
+    if (create) {
+      $('#welcome-name').value = '';
+      pickedGender = null;
+      renderGenderPick();
+      setTimeout(() => $('#welcome-name').focus(), 50);
+    } else {
+      renderProfileList();
+    }
+  }
+
+  function hideWelcome() {
+    $('#welcome').hidden = true;
+    document.body.classList.remove('modal-open');
+  }
+
+  function renderGenderPick() {
+    $('#welcome-gender').replaceChildren(...Avatar.GENDERS.map(g => el('button', {
+      type: 'button',
+      role: 'radio',
+      'aria-checked': String(pickedGender === g.id),
+      class: 'gender-opt' + (pickedGender === g.id ? ' active' : ''),
+      onclick: () => { pickedGender = g.id; renderGenderPick(); },
+      html: Avatar.svg(Avatar.defaultsFor(g.id), '60 10 180 590') + `<span>${g.label}</span>`,
+    })));
+  }
+
+  async function renderProfileList() {
+    const list = $('#profile-list');
+    list.replaceChildren(...S.profiles.map(p => {
+      const face = el('span', { class: 'me-face', html: Avatar.svg(Avatar.defaultsFor(p.gender), '104 22 92 92') });
+      DB.get('settings', pkey('avatar', p)).then(a => { if (a) face.innerHTML = Avatar.svg(a, '104 22 92 92'); }).catch(() => {});
+      const g = Avatar.GENDERS.find(x => x.id === p.gender);
+      return el('button', { class: 'profile-btn', onclick: () => signIn(p) },
+        face,
+        el('span', {}, el('strong', {}, p.name), el('span', { class: 'muted' }, g ? g.label : '')));
+    }));
+  }
 
   /* ---------- navigation ---------- */
   function show(view) {
@@ -85,6 +215,18 @@ const App = (() => {
       const g = e.target.closest('[data-goto]');
       if (g) show(g.dataset.goto);
     });
+    $('#me-btn').addEventListener('click', () => show('avatar'));
+
+    // Welcome screen
+    $('#welcome-new').addEventListener('click', () => showWelcome('create'));
+    $('#welcome-back').addEventListener('click', () => showWelcome('pick'));
+    $('#welcome-form').addEventListener('submit', e => {
+      e.preventDefault();
+      const name = $('#welcome-name').value.trim();
+      if (!name) { toast('Please enter your name'); $('#welcome-name').focus(); return; }
+      if (!pickedGender) { toast('Please choose one of the options'); return; }
+      createProfile(name, pickedGender);
+    });
 
     for (const id of ['#input-camera', '#input-upload']) {
       $(id).addEventListener('change', e => {
@@ -98,7 +240,7 @@ const App = (() => {
     document.addEventListener('drop', e => {
       if (!e.dataTransfer || !e.dataTransfer.files.length) return;
       e.preventDefault();
-      handleFiles([...e.dataTransfer.files]);
+      if (S.profile) handleFiles([...e.dataTransfer.files]);
     });
 
     $('#act-shuffle').addEventListener('click', shuffle);
@@ -106,8 +248,7 @@ const App = (() => {
     $('#act-save').addEventListener('click', saveOutfit);
     $('#act-share').addEventListener('click', shareLook);
 
-    const cats = CATEGORIES.map(c => el('option', { value: c.id }, c.one));
-    $('#item-cat').append(...cats);
+    $('#item-cat').append(...CATEGORIES.map(c => el('option', { value: c.id }, c.one)));
 
     // Click on backdrop closes dialogs
     $$('dialog').forEach(d => d.addEventListener('click', e => { if (e.target === d) d.close('cancel'); }));
@@ -116,7 +257,7 @@ const App = (() => {
   /* ---------- adding clothes ---------- */
   async function handleFiles(files) {
     files = files.filter(f => !f.type || f.type.startsWith('image/'));
-    if (!files.length) return;
+    if (!files.length || !S.profile) return;
     for (let i = 0; i < files.length; i++) {
       let res;
       try {
@@ -133,6 +274,7 @@ const App = (() => {
       const count = S.items.filter(x => x.category === res.category).length;
       const it = {
         id: uid(),
+        profileId: S.profile.id,
         name: res.name || `${CAT[res.category].one} ${count + 1}`,
         category: res.category,
         blob: res.blob, w: res.w, h: res.h,
@@ -250,7 +392,7 @@ const App = (() => {
     if (name === null) return;
     const c = await Stage.renderCanvas(2, S.avatar);
     const thumb = await canvasToBlob(c, 'image/jpeg', 0.9);
-    const o = { id: uid(), name: name || `Look ${S.outfits.length + 1}`, layers, thumb, createdAt: Date.now() };
+    const o = { id: uid(), profileId: S.profile.id, name: name || `Look ${S.outfits.length + 1}`, layers, thumb, createdAt: Date.now() };
     try { await DB.put('outfits', o); } catch (e) { console.error(e); toast('Couldn’t save the look'); return; }
     S.outfits.unshift({ ...o, url: URL.createObjectURL(thumb) });
     renderOutfits();
@@ -305,10 +447,16 @@ const App = (() => {
 
   /* ---------- avatar ---------- */
   function buildAvatarEditor() {
+    if (!S.profile) return;
     const set = (key, val) => {
       S.avatar[key] = val;
+      if (key === 'gender') {
+        S.profile.gender = val;
+        DB.put('settings', S.profiles, 'profiles').catch(console.error);
+      }
       saveAvatar();
       Stage.setAvatar(S.avatar);
+      updateMe();
       buildAvatarEditor();
     };
     const swatches = (title, key, colors) => el('div', { class: 'ctrl' },
@@ -317,20 +465,29 @@ const App = (() => {
         class: 'swatch' + (S.avatar[key] === c ? ' active' : ''),
         style: `background:${c}`, 'aria-label': `${title} ${c}`, onclick: () => set(key, c),
       }))));
+    const textOptions = (title, key, opts) => el('div', { class: 'ctrl' }, el('h3', {}, title),
+      el('div', { class: 'options' }, opts.map(o => el('button', {
+        class: 'option text' + (S.avatar[key] === o.id ? ' active' : ''), onclick: () => set(key, o.id),
+      }, o.label))));
+    const headOptions = (title, key, opts) => el('div', { class: 'ctrl' }, el('h3', {}, title),
+      el('div', { class: 'options' }, opts.map(o => el('button', {
+        class: 'option' + (S.avatar[key] === o.id ? ' active' : ''), onclick: () => set(key, o.id),
+        html: Avatar.svg({ ...S.avatar, [key]: o.id }, '88 4 124 140') + `<span>${o.label}</span>`,
+      }))));
 
     $('#avatar-preview').innerHTML = Avatar.svg(S.avatar);
     $('#avatar-controls').replaceChildren(
+      el('div', { class: 'profile-card' },
+        el('div', {}, el('strong', {}, S.profile.name), el('span', { class: 'muted' }, 'Signed in on this device')),
+        el('div', { class: 'row' },
+          el('button', { class: 'btn small', onclick: switchProfile }, 'Switch profile'),
+          el('button', { class: 'btn small danger-ghost', onclick: deleteProfile }, 'Delete'))),
+      textOptions('Gender', 'gender', Avatar.GENDERS),
       swatches('Skin tone', 'skin', Avatar.SKIN),
-      el('div', { class: 'ctrl' }, el('h3', {}, 'Body'),
-        el('div', { class: 'options' }, Avatar.BODIES.map(b => el('button', {
-          class: 'option text' + (S.avatar.body === b.id ? ' active' : ''), onclick: () => set('body', b.id),
-        }, b.label)))),
-      el('div', { class: 'ctrl' }, el('h3', {}, 'Hair style'),
-        el('div', { class: 'options' }, Avatar.HAIR_STYLES.map(hs => el('button', {
-          class: 'option' + (S.avatar.hairStyle === hs.id ? ' active' : ''), onclick: () => set('hairStyle', hs.id),
-          html: Avatar.svg({ ...S.avatar, hairStyle: hs.id }, '88 4 124 140') + `<span>${hs.label}</span>`,
-        })))),
+      textOptions('Body', 'body', Avatar.BODIES),
+      headOptions('Hair style', 'hairStyle', Avatar.HAIR_STYLES),
       swatches('Hair colour', 'hairColor', Avatar.HAIR_COLORS),
+      headOptions('Facial hair', 'facial', Avatar.FACIAL),
       swatches('Eyes', 'eyes', Avatar.EYES),
       swatches('Basics', 'under', Avatar.UNDER),
     );
