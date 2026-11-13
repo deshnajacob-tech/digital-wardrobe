@@ -12,7 +12,7 @@ const App = (() => {
   const putSoonA = debounce((k, v) => DB.put('settings', v, k).catch(console.error), 300);
   const putSoonB = debounce((k, v) => DB.put('settings', v, k).catch(console.error), 400);
   const saveAvatar = () => { if (S.profile) putSoonA(pkey('avatar'), { ...S.avatar }); };
-  const saveCurrent = () => { if (S.profile) putSoonB(pkey('current'), Stage.getLayers()); };
+  const saveCurrent = () => { if (S.profile) putSoonB(pkey('current'), { fit: Stage.getFit(), layers: Stage.getLayers() }); };
 
   async function start() {
     Editor.init();
@@ -71,7 +71,10 @@ const App = (() => {
     S.filter = S.drawer = 'all';
 
     Stage.setAvatar(S.avatar);
-    Stage.setLayers(current || []);
+    // `current` was a bare layer array before figures had their own fit.
+    const cur = Array.isArray(current) ? { fit: 'tall', layers: current } : (current || { fit: Stage.getFit(), layers: [] });
+    Stage.setLayers(cur.layers || []);
+    if (cur.fit !== Stage.getFit() && (cur.layers || []).length) Stage.refit();
     hideWelcome();
     updateMe();
     buildAvatarEditor();
@@ -168,7 +171,7 @@ const App = (() => {
       'aria-checked': String(pickedGender === g.id),
       class: 'gender-opt' + (pickedGender === g.id ? ' active' : ''),
       onclick: () => { pickedGender = g.id; renderGenderPick(); },
-      html: Avatar.svg(Avatar.defaultsFor(g.id), '60 10 180 590') + `<span>${g.label}</span>`,
+      html: Avatar.svg(Avatar.defaultsFor(g.id), '0 10 300 590') + `<span>${g.label}</span>`,
     })));
   }
 
@@ -395,7 +398,7 @@ const App = (() => {
     if (name === null) return;
     const c = await Stage.renderCanvas(2, S.avatar);
     const thumb = await canvasToBlob(c, 'image/jpeg', 0.9);
-    const o = { id: uid(), profileId: S.profile.id, name: name || `Look ${S.outfits.length + 1}`, layers, thumb, createdAt: Date.now() };
+    const o = { id: uid(), profileId: S.profile.id, name: name || `Look ${S.outfits.length + 1}`, layers, fit: Stage.getFit(), thumb, createdAt: Date.now() };
     try { await DB.put('outfits', o); } catch (e) { console.error(e); toast('Couldn’t save the look'); return; }
     S.outfits.unshift({ ...o, url: URL.createObjectURL(thumb) });
     renderOutfits();
@@ -431,6 +434,7 @@ const App = (() => {
       if (r === 'wear') {
         const kept = o.layers.filter(l => S.byId.has(l.itemId));
         Stage.setLayers(kept);
+        if ((o.fit || 'tall') !== Stage.getFit()) Stage.refit();
         saveCurrent();
         show('dressup');
         if (kept.length < o.layers.length) toast('Some pieces were deleted from your wardrobe');
@@ -458,7 +462,9 @@ const App = (() => {
         DB.put('settings', S.profiles, 'profiles').catch(console.error);
       }
       saveAvatar();
+      const before = Stage.getFit();
       Stage.setAvatar(S.avatar);
+      if (Stage.getFit() !== before && Stage.getLayers().length) Stage.refit();
       updateMe();
       buildAvatarEditor();
     };
@@ -475,7 +481,7 @@ const App = (() => {
     const headOptions = (title, key, opts) => el('div', { class: 'ctrl' }, el('h3', {}, title),
       el('div', { class: 'options' }, opts.map(o => el('button', {
         class: 'option' + (S.avatar[key] === o.id ? ' active' : ''), onclick: () => set(key, o.id),
-        html: Avatar.svg({ ...S.avatar, [key]: o.id }, '88 4 124 140') + `<span>${o.label}</span>`,
+        html: Avatar.svg({ ...S.avatar, [key]: o.id }, Avatar.headBox(S.avatar)) + `<span>${o.label}</span>`,
       }))));
 
     $('#avatar-preview').innerHTML = Avatar.svg(S.avatar);

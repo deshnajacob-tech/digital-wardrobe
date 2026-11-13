@@ -1,5 +1,5 @@
 /* The customizable avatar, drawn as SVG in a 300×600 space.
- * Two styles: "blocky" (chunky toy figure, default) and "illustrated" (fashion illustration). */
+ * Three styles: "chibi" (default), "blocky" (chunky toy figure) and "illustrated" (fashion illustration). */
 const Avatar = (() => {
   const GENDERS = [
     { id: 'female', label: 'Woman' },
@@ -31,11 +31,12 @@ const Avatar = (() => {
     { id: 'curvy', label: 'Fuller', f: 1.1 },
   ];
   const STYLES = [
+    { id: 'chibi', label: 'Chibi' },
     { id: 'blocky', label: 'Blocky' },
     { id: 'illustrated', label: 'Illustrated' },
   ];
   const DEFAULT = {
-    style: 'blocky', gender: 'female', skin: SKIN[1], hairStyle: 'long', hairColor: HAIR_COLORS[1],
+    style: 'chibi', gender: 'female', skin: SKIN[1], hairStyle: 'long', hairColor: HAIR_COLORS[1],
     eyes: EYES[0], body: 'regular', under: UNDER[0], facial: 'none',
   };
   const PRESETS = {
@@ -312,14 +313,165 @@ const Avatar = (() => {
 </svg>`;
   }
 
+  /* =====================================================================
+   * Chibi style: big round head (~⅓ of the height), small body, stubby limbs,
+   * large sparkly eyes. Clothes use CHIBI_BOXES (config.js) for placement.
+   * ===================================================================== */
+  const CHIBI = {
+    female: {
+      torso: symPath([138, 270], [[128, 270, 120, 272, 116, 280], [112, 290, 116, 320, 122, 340], [118, 360, 114, 380, 114, 396], [150, 402]]),
+      blush: 0.5, lid: 5, flicks: true, brow: 4,
+    },
+    male: {
+      torso: symPath([137, 270], [[126, 270, 114, 272, 110, 282], [108, 296, 114, 322, 120, 342], [118, 362, 116, 380, 116, 396], [150, 402]]),
+      blush: 0.18, lid: 4.2, flicks: false, brow: 6,
+    },
+    neutral: {
+      torso: symPath([138, 270], [[127, 270, 117, 272, 113, 281], [110, 293, 115, 321, 121, 341], [118, 361, 115, 380, 115, 396], [150, 402]]),
+      blush: 0.35, lid: 4.6, flicks: false, brow: 5,
+    },
+  };
+  const CHIBI_FACE = 'M150 40 C215 40 255 85 255 150 C255 205 215 262 150 264 C85 262 45 205 45 150 C45 85 85 40 150 40 Z';
+  const CHIBI_BANGS = 'M42 160 C34 70 90 26 150 26 C210 26 266 70 258 160 C252 142 246 128 238 118 L228 148 L208 108 L190 140 L172 102 L152 134 L132 102 L112 140 L94 108 L74 148 L64 118 C56 128 48 142 42 160 Z';
+
+  function chibiHairBack(style, f) {
+    switch (style) {
+      case 'long': return `<path d="M150 22 C232 22 272 80 270 160 C268 230 280 300 282 360 C230 380 70 380 18 360 C20 300 32 230 30 160 C28 80 68 22 150 22 Z" fill="${f}"/>`;
+      case 'bob': return `<path d="M150 22 C232 22 272 80 270 160 C270 200 272 236 266 262 C220 278 80 278 34 262 C28 236 30 200 30 160 C28 80 68 22 150 22 Z" fill="${f}"/>`;
+      case 'short':
+      case 'quiff': return `<path d="M150 24 C230 24 266 80 264 156 L36 156 C34 80 70 24 150 24 Z" fill="${f}"/>`;
+      case 'bun': return `<circle cx="150" cy="22" r="34" fill="${f}"/><path d="M150 26 C228 26 264 80 262 150 L38 150 C36 80 72 26 150 26 Z" fill="${f}"/>`;
+      case 'curly': return `<ellipse cx="150" cy="150" rx="122" ry="128" fill="${f}"/>` + ring(150, 156, 124, 130, 130, 410, 18, 32, f);
+      default: return '';
+    }
+  }
+
+  function chibiHairFront(style, f, hl) {
+    const shine = d => `<path d="${d}" fill="none" stroke="${hl}" stroke-width="7" stroke-linecap="round" opacity=".45"/>`;
+    const sideLocks = (bottom) =>
+      `<path d="M44 150 C36 200 40 ${bottom - 40} 54 ${bottom} L70 ${bottom - 10} C62 ${bottom - 50} 62 200 66 160 Z" fill="${f}"/>` +
+      `<path d="M256 150 C264 200 260 ${bottom - 40} 246 ${bottom} L230 ${bottom - 10} C238 ${bottom - 50} 238 200 234 160 Z" fill="${f}"/>`;
+    switch (style) {
+      case 'long': return `<path d="${CHIBI_BANGS}" fill="${f}"/>` + sideLocks(300) + shine('M86 66 Q150 40 214 66');
+      case 'bob': return `<path d="${CHIBI_BANGS}" fill="${f}"/>` + sideLocks(250) + shine('M86 66 Q150 40 214 66');
+      case 'short': return `<path d="M42 158 C34 70 90 28 150 28 C210 28 266 70 258 158 C252 140 246 126 238 116 L226 132 L210 98 L188 124 L170 92 L150 118 L130 92 L112 124 L90 98 L74 132 L62 116 C54 126 48 140 42 158 Z" fill="${f}"/>` +
+        shine('M90 62 Q150 40 210 62');
+      case 'quiff': return `<path d="M42 156 C36 92 70 46 120 34 C150 10 214 8 246 44 C262 64 264 110 258 156 C250 130 240 112 226 100 C196 80 160 76 130 84 C100 92 70 110 56 132 C50 140 46 148 42 156 Z" fill="${f}"/>` +
+        shine('M118 46 Q170 22 228 50') + shine('M100 70 Q150 52 210 66');
+      case 'buzz': return `<path d="M50 132 C50 70 96 36 150 36 C204 36 250 70 250 132 C230 100 190 86 150 86 C110 86 70 100 50 132 Z" fill="${f}" opacity=".9"/>`;
+      case 'bun': return `<path d="M44 150 C38 70 92 28 150 28 C208 28 262 70 256 150 C246 112 214 84 150 82 C86 84 54 112 44 150 Z" fill="${f}"/>` +
+        shine('M92 60 Q150 40 208 60') + shine('M132 6 Q150 -2 168 6');
+      case 'curly': return `<path d="M44 140 C40 70 92 30 150 30 C208 30 260 70 256 140 C236 104 196 90 150 90 C104 90 64 104 44 140 Z" fill="${f}"/>` +
+        ring(150, 92, 100, 52, 190, 350, 9, 22, f);
+      default: return '';
+    }
+  }
+
+  function chibiFacialHair(kind, f, clip) {
+    const jaw = 'M58 196 C66 250 108 270 150 270 C192 270 234 250 242 196 C226 226 196 238 172 236 C166 246 134 246 128 236 C104 238 74 226 58 196 Z';
+    if (kind === 'stubble') return `<path d="${jaw}" fill="${f}" opacity=".25" clip-path="url(#${clip})"/>`;
+    if (kind === 'beard') return `<path d="${jaw}" fill="${f}"/><path d="M132 219 C140 210 160 210 168 219 C160 215.5 140 215.5 132 219 Z" fill="${f}"/>`;
+    return '';
+  }
+
+  function chibiSvg(c, viewBox) {
+    const g = CHIBI[c.gender] || CHIBI.female;
+    const k = 'cb' + (++seq);
+    const f = (BODIES.find(b => b.id === c.body) || BODIES[1]).f;
+    const sk = c.skin, skD = shade(sk, -0.14), skDD = shade(sk, -0.3);
+    const hc = c.hairColor, hcL = shade(hc, 0.35);
+    const und = c.under, shorts = mix(und, '#3d5a80', 0.55), shoe = mix(c.hairColor, '#5a3a2a', 0.5);
+    const brow = c.hairStyle === 'none' && c.facial === 'none' ? skDD : shade(hc, -0.1);
+    const bodyT = `translate(150 0) scale(${f} 1) translate(-150 0)`;
+    const size = viewBox ? '' : ` width="${STAGE_W}" height="${STAGE_H}"`;
+    const edge = col => `stroke="${shade(col, -0.3)}" stroke-width="1.6" stroke-linejoin="round"`;
+    const grad = (id, col) => `<linearGradient id="${k}${id}" x1="0" x2="1" y1="0" y2="0">` +
+      `<stop offset="0" stop-color="${shade(col, 0.08)}"/><stop offset=".5" stop-color="${col}"/><stop offset="1" stop-color="${shade(col, -0.14)}"/></linearGradient>`;
+    const limb = d => `<path d="${d}" fill="none" stroke="${skD}" stroke-width="25" stroke-linecap="round"/>` +
+      `<path d="${d}" fill="none" stroke="${sk}" stroke-width="21" stroke-linecap="round"/>`;
+    const sleeve = d => `<path d="${d}" fill="none" stroke="${shade(und, -0.2)}" stroke-width="29" stroke-linecap="round"/>` +
+      `<path d="${d}" fill="none" stroke="${und}" stroke-width="26" stroke-linecap="round"/>`;
+    const eye = (cx, side) => `
+      <clipPath id="${k}e${side}"><ellipse cx="${cx}" cy="178" rx="22" ry="26"/></clipPath>
+      <ellipse cx="${cx}" cy="178" rx="22" ry="26" fill="#fff"/>
+      <g clip-path="url(#${k}e${side})">
+        <ellipse cx="${cx}" cy="183" rx="18" ry="23" fill="url(#${k}i)"/>
+        <ellipse cx="${cx}" cy="185" rx="8.5" ry="11.5" fill="#140d0a"/>
+        <ellipse cx="${cx - 7}" cy="171" rx="7" ry="9" fill="#fff"/>
+        <circle cx="${cx + 8}" cy="195" r="3.6" fill="#fff"/>
+        <path d="M${cx - 20} 166 Q${cx} 154 ${cx + 20} 166 L${cx + 20} 152 L${cx - 20} 152 Z" fill="#000" opacity=".12"/>
+      </g>
+      <path d="M${cx - 25} 173 Q${cx} 145 ${cx + 25} 171" fill="none" stroke="#2a1a14" stroke-width="${g.lid}" stroke-linecap="round"/>`;
+    const flicks = g.flicks
+      ? '<path d="M86 171 L77 163 M89 165 L83 156" stroke="#2a1a14" stroke-width="3.4" stroke-linecap="round"/>' +
+        '<path d="M214 169 L223 161 M211 163 L217 154" stroke="#2a1a14" stroke-width="3.4" stroke-linecap="round"/>'
+      : '';
+    const blushLines = g.flicks || c.gender === 'neutral'
+      ? '<path d="M80 210 l5 -8 M90 210 l5 -8 M100 210 l5 -8 M200 210 l5 -8 M210 210 l5 -8 M220 210 l5 -8" stroke="#e8687a" stroke-width="1.8" stroke-linecap="round" opacity=".6"/>'
+      : '';
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox || `0 0 ${STAGE_W} ${STAGE_H}`}"${size}>
+  <defs>
+    ${grad('s', sk)}${grad('u', und)}${grad('p', shorts)}${grad('f', shoe)}
+    <linearGradient id="${k}h" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${shade(hc, 0.15)}"/><stop offset="1" stop-color="${shade(hc, -0.18)}"/></linearGradient>
+    <linearGradient id="${k}i" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${shade(c.eyes, -0.45)}"/><stop offset=".55" stop-color="${c.eyes}"/><stop offset="1" stop-color="${shade(c.eyes, 0.4)}"/></linearGradient>
+    <radialGradient id="${k}g"><stop offset="0" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+    <clipPath id="${k}face"><path d="${CHIBI_FACE}"/></clipPath>
+  </defs>
+  <ellipse cx="150" cy="588" rx="64" ry="8" fill="url(#${k}g)"/>
+  ${chibiHairBack(c.hairStyle, `url(#${k}h)`)}
+
+  <g transform="${bodyT}">
+    ${box(122, 390, 26, 172, 12, `url(#${k}s)`, edge(sk))}
+    ${box(152, 390, 26, 172, 12, `url(#${k}s)`, edge(sk))}
+    ${box(114, 548, 38, 40, 16, `url(#${k}f)`, edge(shoe))}
+    ${box(148, 548, 38, 40, 16, `url(#${k}f)`, edge(shoe))}
+    ${box(117, 552, 18, 6, 3, '#fff', 'opacity=".35"')}${box(151, 552, 18, 6, 3, '#fff', 'opacity=".35"')}
+    ${box(114, 386, 72, 46, 14, `url(#${k}p)`, edge(shorts))}
+    ${limb('M118 286 C104 302 98 330 100 370')}
+    ${limb('M182 286 C196 302 202 330 200 370')}
+    <circle cx="100" cy="376" r="13" fill="${sk}" ${edge(sk)}/>
+    <circle cx="200" cy="376" r="13" fill="${sk}" ${edge(sk)}/>
+    <path d="${g.torso}" fill="url(#${k}u)" ${edge(und)}/>
+    ${sleeve('M119 285 C112 292 108 300 106 310')}
+    ${sleeve('M181 285 C188 292 192 300 194 310')}
+    <path d="M136 270 Q150 286 164 270 Z" fill="${skD}"/>
+  </g>
+
+  ${box(139, 250, 22, 28, 8, skD)}
+  <ellipse cx="47" cy="176" rx="11" ry="17" fill="${skD}"/>
+  <ellipse cx="253" cy="176" rx="11" ry="17" fill="${skD}"/>
+  <path d="${CHIBI_FACE}" fill="url(#${k}s)" ${edge(sk)}/>
+
+  <ellipse cx="90" cy="208" rx="17" ry="9" fill="#f58a96" opacity="${g.blush}"/>
+  <ellipse cx="210" cy="208" rx="17" ry="9" fill="#f58a96" opacity="${g.blush}"/>
+  ${blushLines}
+  <path d="M94 141 Q110 132 126 139" fill="none" stroke="${brow}" stroke-width="${g.brow}" stroke-linecap="round"/>
+  <path d="M206 141 Q190 132 174 139" fill="none" stroke="${brow}" stroke-width="${g.brow}" stroke-linecap="round"/>
+  ${eye(110, 'l')}${eye(190, 'r')}
+  ${flicks}
+  <ellipse cx="150" cy="207" rx="2.4" ry="1.7" fill="${skDD}" opacity=".6"/>
+  ${chibiFacialHair(c.facial, `url(#${k}h)`, `${k}face`)}
+  <path d="M139 221 Q150 235 161 221 Q150 225 139 221 Z" fill="#7a2e34"/>
+  <path d="M144 228 Q150 225 156 228 Q153 231.5 150 231.5 Q147 231.5 144 228 Z" fill="#ec7f8a"/>
+
+  ${chibiHairFront(c.hairStyle, `url(#${k}h)`, hcL)}
+</svg>`;
+  }
+
   /** Returns the avatar as an SVG string. `viewBox` lets callers crop (e.g. head thumbnails). */
   function svg(cfg, viewBox) {
     const c = Object.assign({}, DEFAULT, cfg || {});
-    return c.style === 'illustrated' ? illustratedSvg(c, viewBox) : blockySvg(c, viewBox);
+    if (c.style === 'illustrated') return illustratedSvg(c, viewBox);
+    if (c.style === 'blocky') return blockySvg(c, viewBox);
+    return chibiSvg(c, viewBox);
   }
 
+  const styleOf = cfg => (cfg && cfg.style) || DEFAULT.style;
   /** A square viewBox framing the face, for profile pictures. */
-  const faceBox = cfg => ((cfg && cfg.style) || DEFAULT.style) === 'illustrated' ? '104 22 92 92' : '90 14 120 128';
+  const faceBox = cfg => ({ illustrated: '104 22 92 92', blocky: '90 14 120 128', chibi: '26 14 248 256' })[styleOf(cfg)] || '26 14 248 256';
+  /** A viewBox framing the head and hair, for option thumbnails. */
+  const headBox = cfg => ({ illustrated: '88 4 124 140', blocky: '86 0 128 146' })[styleOf(cfg)] || '6 0 288 300';
 
   function illustratedSvg(c, viewBox) {
     const fig = FIGURES[c.gender] || FIGURES.female;
@@ -429,5 +581,5 @@ const Avatar = (() => {
 
   const dataURL = cfg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(cfg));
 
-  return { STYLES, faceBox, GENDERS, SKIN, HAIR_COLORS, EYES, UNDER, HAIR_STYLES, FACIAL, BODIES, DEFAULT, defaultsFor, svg, dataURL };
+  return { STYLES, faceBox, headBox, GENDERS, SKIN, HAIR_COLORS, EYES, UNDER, HAIR_STYLES, FACIAL, BODIES, DEFAULT, defaultsFor, svg, dataURL };
 })();

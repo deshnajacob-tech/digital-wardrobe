@@ -40,7 +40,21 @@ const Stage = (() => {
   const sorted = () => [...layers].sort((a, b) => a.z - b.z);
   const current = () => layers.find(l => l.itemId === selectedId) || null;
 
-  function setAvatar(cfg) { avatarEl.innerHTML = Avatar.svg(cfg); }
+  let fit = 'tall';
+  function setAvatar(cfg) { avatarEl.innerHTML = Avatar.svg(cfg); fit = fitOf(cfg); }
+  const getFit = () => fit;
+
+  /** Move every worn piece back to its default spot for the current figure (keeps layer order). */
+  function refit() {
+    const old = layers;
+    layers = [];
+    for (const l of old) {
+      const it = getItem(l.itemId);
+      if (it) layers.push({ ...defaultLayer(it), z: l.z });
+    }
+    render();
+    onChange();
+  }
 
   function setLayers(list) {
     layers = (list || []).map(l => ({ ...l }));
@@ -82,7 +96,7 @@ const Stage = (() => {
 
   function defaultLayer(it) {
     const c = CAT[it.category] || CAT.accessory;
-    const b = c.box;
+    const b = boxFor(it.category, fit);
     const ar = it.w / it.h;
     const w = Math.min(b.w, b.h * ar);
     const h = w / ar;
@@ -301,5 +315,5 @@ const Stage = (() => {
 
   function forget(id) { alphaCache.delete(id); remove(id); }
 
-  return { init, setAvatar, setLayers, getLayers, isWorn, wear, remove: forget, clear, select, renderCanvas };
+  return { init, setAvatar, getFit, refit, setLayers, getLayers, isWorn, wear, remove: forget, clear, select, renderCanvas };
 })();

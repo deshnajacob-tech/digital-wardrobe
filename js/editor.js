@@ -274,6 +274,7 @@ const Editor = (() => {
 
   /* ---------- save ---------- */
   async function save() {
+    if (!src) return;
     render();
     const o = out.data;
     let minX = W, minY = H, maxX = -1, maxY = -1;

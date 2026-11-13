@@ -18,6 +18,20 @@ const CATEGORIES = [
 ];
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
 
+// The chibi figure has a big head and a small body, so clothes land in different places.
+const CHIBI_BOXES = {
+  top:       { cx: 150, w: 124, h: 130, anchor: 'top',    ay: 264 },
+  bottom:    { cx: 150, w: 92,  h: 170, anchor: 'top',    ay: 384 },
+  dress:     { cx: 150, w: 134, h: 270, anchor: 'top',    ay: 264 },
+  outerwear: { cx: 150, w: 140, h: 180, anchor: 'top',    ay: 260 },
+  shoes:     { cx: 150, w: 80,  h: 42,  anchor: 'bottom', ay: 590 },
+  hat:       { cx: 150, w: 230, h: 110, anchor: 'bottom', ay: 108 },
+  accessory: { cx: 150, w: 70,  h: 70,  anchor: 'center', ay: 330 },
+};
+/** Placement group for an avatar config: 'chibi' or 'tall'. */
+const fitOf = cfg => (cfg && cfg.style === 'chibi' ? 'chibi' : 'tall');
+const boxFor = (category, fit) => (fit === 'chibi' ? CHIBI_BOXES[category] || CHIBI_BOXES.accessory : (CAT[category] || CAT.accessory).box);
+
 const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
