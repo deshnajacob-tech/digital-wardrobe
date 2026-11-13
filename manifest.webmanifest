@@ -1,0 +1,14 @@
+{
+  "name": "Closet – Digital Wardrobe",
+  "short_name": "Closet",
+  "description": "Photograph your clothes and dress up your own avatar.",
+  "start_url": "./index.html#wardrobe",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f1ec",
+  "theme_color": "#f7f1ec",
+  "icons": [
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
