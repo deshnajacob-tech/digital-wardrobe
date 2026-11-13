@@ -132,7 +132,7 @@ const App = (() => {
     b.hidden = !S.profile;
     if (!S.profile) return;
     $('#me-name').textContent = S.profile.name;
-    $('#me-face').innerHTML = Avatar.svg(S.avatar, '104 22 92 92');
+    $('#me-face').innerHTML = Avatar.svg(S.avatar, Avatar.faceBox(S.avatar));
   }
 
   /* ---------- welcome screen ---------- */
@@ -175,8 +175,11 @@ const App = (() => {
   async function renderProfileList() {
     const list = $('#profile-list');
     list.replaceChildren(...S.profiles.map(p => {
-      const face = el('span', { class: 'me-face', html: Avatar.svg(Avatar.defaultsFor(p.gender), '104 22 92 92') });
-      DB.get('settings', pkey('avatar', p)).then(a => { if (a) face.innerHTML = Avatar.svg(a, '104 22 92 92'); }).catch(() => {});
+      const base = Avatar.defaultsFor(p.gender);
+      const face = el('span', { class: 'me-face', html: Avatar.svg(base, Avatar.faceBox(base)) });
+      DB.get('settings', pkey('avatar', p)).then(a => {
+        if (a) { const cfg = { ...base, ...a }; face.innerHTML = Avatar.svg(cfg, Avatar.faceBox(cfg)); }
+      }).catch(() => {});
       const g = Avatar.GENDERS.find(x => x.id === p.gender);
       return el('button', { class: 'profile-btn', onclick: () => signIn(p) },
         face,
@@ -482,6 +485,7 @@ const App = (() => {
         el('div', { class: 'row' },
           el('button', { class: 'btn small', onclick: switchProfile }, 'Switch profile'),
           el('button', { class: 'btn small danger-ghost', onclick: deleteProfile }, 'Delete'))),
+      textOptions('Style', 'style', Avatar.STYLES),
       textOptions('Gender', 'gender', Avatar.GENDERS),
       swatches('Skin tone', 'skin', Avatar.SKIN),
       textOptions('Body', 'body', Avatar.BODIES),

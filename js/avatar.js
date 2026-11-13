@@ -1,4 +1,5 @@
-/* The customizable avatar: a fashion-illustration figure drawn as SVG in a 300×600 space. */
+/* The customizable avatar, drawn as SVG in a 300×600 space.
+ * Two styles: "blocky" (chunky toy figure, default) and "illustrated" (fashion illustration). */
 const Avatar = (() => {
   const GENDERS = [
     { id: 'female', label: 'Woman' },
@@ -29,8 +30,12 @@ const Avatar = (() => {
     { id: 'regular', label: 'Regular', f: 1 },
     { id: 'curvy', label: 'Fuller', f: 1.1 },
   ];
+  const STYLES = [
+    { id: 'blocky', label: 'Blocky' },
+    { id: 'illustrated', label: 'Illustrated' },
+  ];
   const DEFAULT = {
-    gender: 'female', skin: SKIN[1], hairStyle: 'long', hairColor: HAIR_COLORS[1],
+    style: 'blocky', gender: 'female', skin: SKIN[1], hairStyle: 'long', hairColor: HAIR_COLORS[1],
     eyes: EYES[0], body: 'regular', under: UNDER[0], facial: 'none',
   };
   const PRESETS = {
@@ -183,9 +188,140 @@ const Avatar = (() => {
     return '';
   }
 
+  /* =====================================================================
+   * Blocky toy style: rounded-cube head, block torso and limbs.
+   * Same landmarks as the illustrated figure so clothes land in the same places.
+   * ===================================================================== */
+  const BLOCK = {
+    female: { torso: [100, 200, 108, 192], leg: [105, 44], blush: 0.45, lashes: true },
+    male: { torso: [92, 208, 101, 199], leg: [101, 48], blush: 0.12, lashes: false },
+    neutral: { torso: [96, 204, 104, 196], leg: [103, 46], blush: 0.3, lashes: false },
+  };
+
+  // Rounded quadrilateral: top edge x1..x2 at y1, bottom edge x3..x4 at y2.
+  function slab(x1, x2, y1, x3, x4, y2, r) {
+    return `M${x1 + r} ${y1} L${x2 - r} ${y1} Q${x2} ${y1} ${x2} ${y1 + r} L${x4} ${y2 - r} Q${x4} ${y2} ${x4 - r} ${y2} ` +
+      `L${x3 + r} ${y2} Q${x3} ${y2} ${x3} ${y2 - r} L${x1} ${y1 + r} Q${x1} ${y1} ${x1 + r} ${y1} Z`;
+  }
+  const HEAD_T = 'translate(150 84) scale(1.12) translate(-150 -84)'; // chunkier head
+  const box = (x, y, w, h, r, fill, extra = '') => `<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="${r}" fill="${fill}" ${extra}/>`;
+
+  const BLOCK_CAP = 'M102 74 L102 46 Q102 28 122 28 L178 28 Q198 28 198 46 L198 74 L188 74 L186 56 Q168 50 150 58 Q132 62 114 56 L112 74 Z';
+  const BLOCK_CURLS_BACK = [[94, 26], [116, 18], [140, 14], [164, 18], [186, 26], [88, 50], [192, 50], [88, 76], [192, 76], [90, 102], [190, 102], [96, 124], [184, 124]];
+  const BLOCK_CURLS_FRONT = [[102, 32], [124, 26], [148, 24], [172, 30], [104, 52], [180, 50]];
+
+  function blockHairBack(style, f) {
+    switch (style) {
+      case 'long': return box(98, 34, 104, 156, 18, f);
+      case 'bob': return box(98, 34, 104, 100, 18, f);
+      case 'curly': return BLOCK_CURLS_BACK.map(([x, y]) => box(x, y, 26, 26, 10, f)).join('');
+      default: return '';
+    }
+  }
+
+  function blockHairFront(style, f, hl) {
+    const shine = (x, y, w) => box(x, y, w, 4, 2, hl, 'opacity=".5"');
+    switch (style) {
+      case 'long': return `<path d="${BLOCK_CAP}" fill="${f}"/>` + box(98, 58, 14, 118, 6, f) + box(188, 58, 14, 118, 6, f) + shine(124, 34, 34);
+      case 'bob': return `<path d="${BLOCK_CAP}" fill="${f}"/>` + box(98, 58, 15, 72, 6, f) + box(187, 58, 15, 72, 6, f) + shine(124, 34, 34);
+      case 'short': return `<path d="M104 70 L104 46 Q104 30 120 30 L180 30 Q196 30 196 46 L196 70 L188 70 L186 56 L172 53 L164 60 L152 53 L140 60 L128 53 L114 58 L112 70 Z" fill="${f}"/>` + shine(128, 36, 30);
+      case 'quiff': return `<path d="M104 70 L104 48 Q104 34 118 32 L182 32 Q196 34 196 48 L196 70 L188 70 Q186 56 150 54 Q114 56 112 70 Z" fill="${f}"/>` +
+        `<path d="M108 46 Q108 16 136 12 L170 12 Q192 14 192 36 L192 46 Q170 40 150 44 Q128 48 108 46 Z" fill="${f}"/>` + shine(130, 18, 34);
+      case 'buzz': return `<path d="M106 62 L106 50 Q106 36 122 36 L178 36 Q194 36 194 50 L194 62 Q172 52 150 52 Q128 52 106 62 Z" fill="${f}" opacity=".9"/>`;
+      case 'bun': return box(132, 6, 36, 30, 12, f) + `<path d="M104 70 L104 48 Q104 32 122 32 L178 32 Q196 32 196 48 L196 70 L188 70 Q186 52 150 50 Q114 52 112 70 Z" fill="${f}"/>` + shine(140, 12, 20);
+      case 'curly': return `<path d="M104 64 L104 46 Q104 30 122 30 L178 30 Q196 30 196 46 L196 64 Q172 50 150 50 Q128 50 104 64 Z" fill="${f}"/>` +
+        BLOCK_CURLS_FRONT.map(([x, y]) => box(x, y, 24, 24, 9, f)).join('');
+      default: return '';
+    }
+  }
+
+  function blockFacialHair(kind, f) {
+    const jaw = 'M106 94 L115 94 Q118 122 150 122 Q182 122 185 94 L194 94 L194 116 Q194 132 176 132 L124 132 Q106 132 106 116 Z';
+    if (kind === 'stubble') return `<path d="${jaw}" fill="${f}" opacity=".25"/>`;
+    if (kind === 'beard') return `<path d="${jaw}" fill="${f}"/>` + box(136, 100, 28, 6, 3, f);
+    return '';
+  }
+
+  function blockySvg(c, viewBox) {
+    const g = BLOCK[c.gender] || BLOCK.female;
+    const k = 'bk' + (++seq);
+    const f = (BODIES.find(b => b.id === c.body) || BODIES[1]).f;
+    const sk = c.skin, skD = shade(sk, -0.14), skDD = shade(sk, -0.3);
+    const hc = c.hairColor, hcL = shade(hc, 0.3);
+    const und = c.under, shorts = mix(und, '#3d5a80', 0.55), shoe = mix(shade(und, -0.2), '#ffffff', 0.25);
+    const brow = c.hairStyle === 'none' && c.facial === 'none' ? skDD : shade(hc, -0.15);
+    const bodyT = `translate(150 0) scale(${f} 1) translate(-150 0)`;
+    const size = viewBox ? '' : ` width="${STAGE_W}" height="${STAGE_H}"`;
+    const edge = col => `stroke="${shade(col, -0.32)}" stroke-width="1.5" stroke-linejoin="round"`;
+    const grad = (id, col) => `<linearGradient id="${k}${id}" x1="0" x2="1" y1="0" y2="0">` +
+      `<stop offset="0" stop-color="${shade(col, 0.1)}"/><stop offset=".55" stop-color="${col}"/><stop offset="1" stop-color="${shade(col, -0.16)}"/></linearGradient>`;
+    const [t1, t2, t3, t4] = g.torso;
+    const [lx, lw] = g.leg;
+    const rx = STAGE_W - lx - lw;
+
+    const leg = x => box(x, 296, lw, 276, 7, `url(#${k}s)`, edge(sk)) +
+      box(x, 296, lw, 62, 6, `url(#${k}p)`, edge(shorts)) +
+      box(x - 2, 560, lw + 4, 28, 8, `url(#${k}f)`, edge(shoe)) +
+      box(x + 3, 566, lw - 6, 4, 2, '#ffffff', 'opacity=".45"');
+    const eye = cx => `<ellipse cx="${cx}" cy="85" rx="8" ry="9" fill="#fff"/>` +
+      `<circle cx="${cx}" cy="86" r="5.6" fill="${c.eyes}"/><circle cx="${cx}" cy="86" r="2.6" fill="#140d0a"/>` +
+      `<circle cx="${cx + 2.2}" cy="83" r="1.8" fill="#fff"/>`;
+    const lashes = g.lashes
+      ? `<path d="M123 80 L119 76.5 M124.5 77.5 L121.5 73.5" stroke="#1f1612" stroke-width="2" stroke-linecap="round"/>` +
+        `<path d="M177 80 L181 76.5 M175.5 77.5 L178.5 73.5" stroke="#1f1612" stroke-width="2" stroke-linecap="round"/>`
+      : '';
+
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox || `0 0 ${STAGE_W} ${STAGE_H}`}"${size}>
+  <defs>
+    ${grad('s', sk)}${grad('h', hc)}${grad('u', und)}${grad('p', shorts)}${grad('f', shoe)}
+    <radialGradient id="${k}g"><stop offset="0" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient>
+  </defs>
+  <ellipse cx="150" cy="588" rx="78" ry="9" fill="url(#${k}g)"/>
+  <g transform="${HEAD_T}">${blockHairBack(c.hairStyle, `url(#${k}h)`)}</g>
+
+  <g transform="${bodyT}">
+    ${leg(lx)}${leg(rx)}
+    ${box(t1 - 32, 142, 30, 158, 9, `url(#${k}s)`, edge(sk))}
+    ${box(t2 + 2, 142, 30, 158, 9, `url(#${k}s)`, edge(sk))}
+    ${box(t1 - 32, 142, 30, 40, 9, `url(#${k}u)`, edge(und))}
+    ${box(t2 + 2, 142, 30, 40, 9, `url(#${k}u)`, edge(und))}
+    <path d="${slab(t1, t2, 140, t3, t4, 302, 10)}" fill="url(#${k}u)" ${edge(und)}/>
+    <path d="M134 140 Q150 158 166 140 Z" fill="${skD}"/>
+    ${box(t3 + 4, 286, t4 - t3 - 8, 5, 2.5, shade(und, -0.12))}
+  </g>
+
+  ${box(137, 122, 26, 22, 4, skD)}
+  <g transform="${HEAD_T}">
+  ${box(106, 40, 88, 92, 20, `url(#${k}s)`, edge(sk))}
+  ${box(112, 44, 30, 6, 3, '#ffffff', 'opacity=".22"')}
+
+  <circle cx="121" cy="103" r="7" fill="#f07c86" opacity="${g.blush}"/>
+  <circle cx="179" cy="103" r="7" fill="#f07c86" opacity="${g.blush}"/>
+  ${box(122, 68, 19, 5, 2.5, brow, 'transform="rotate(-6 131 70)"')}
+  ${box(159, 68, 19, 5, 2.5, brow, 'transform="rotate(6 169 70)"')}
+  ${eye(132)}${eye(168)}
+  ${lashes}
+  <path d="M147 97 Q150 100 153 97" fill="none" stroke="${skDD}" stroke-width="2" stroke-linecap="round"/>
+  ${blockFacialHair(c.facial, `url(#${k}h)`)}
+  <path d="M139 106 L161 106 Q159 119 150 119 Q141 119 139 106 Z" fill="#6b2a2e"/>
+  <path d="M141 106 L159 106 L158.4 109.5 L141.6 109.5 Z" fill="#fff"/>
+  <path d="M144 116 Q150 113 156 116 Q153 119 150 119 Q147 119 144 116 Z" fill="#e0707a"/>
+
+  ${blockHairFront(c.hairStyle, `url(#${k}h)`, hcL)}
+  </g>
+</svg>`;
+  }
+
   /** Returns the avatar as an SVG string. `viewBox` lets callers crop (e.g. head thumbnails). */
   function svg(cfg, viewBox) {
     const c = Object.assign({}, DEFAULT, cfg || {});
+    return c.style === 'illustrated' ? illustratedSvg(c, viewBox) : blockySvg(c, viewBox);
+  }
+
+  /** A square viewBox framing the face, for profile pictures. */
+  const faceBox = cfg => ((cfg && cfg.style) || DEFAULT.style) === 'illustrated' ? '104 22 92 92' : '90 14 120 128';
+
+  function illustratedSvg(c, viewBox) {
     const fig = FIGURES[c.gender] || FIGURES.female;
     const k = 'av' + (++seq);
     const f = (BODIES.find(b => b.id === c.body) || BODIES[1]).f;
@@ -293,5 +429,5 @@ const Avatar = (() => {
 
   const dataURL = cfg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg(cfg));
 
-  return { GENDERS, SKIN, HAIR_COLORS, EYES, UNDER, HAIR_STYLES, FACIAL, BODIES, DEFAULT, defaultsFor, svg, dataURL };
+  return { STYLES, faceBox, GENDERS, SKIN, HAIR_COLORS, EYES, UNDER, HAIR_STYLES, FACIAL, BODIES, DEFAULT, defaultsFor, svg, dataURL };
 })();
