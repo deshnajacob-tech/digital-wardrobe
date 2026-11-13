@@ -9,11 +9,11 @@ const STAGE_H = 600;
 // bottom or centre to the y coordinate `ay`. `z` sets the default layering.
 const CATEGORIES = [
   { id: 'top',       label: 'Tops',        one: 'Top',       z: 3, box: { cx: 150, w: 180, h: 200, anchor: 'top',    ay: 150 } },
-  { id: 'bottom',    label: 'Bottoms',     one: 'Bottom',    z: 2, box: { cx: 150, w: 150, h: 270, anchor: 'top',    ay: 296 } },
+  { id: 'bottom',    label: 'Bottoms',     one: 'Bottom',    z: 2, box: { cx: 150, w: 150, h: 290, anchor: 'top',    ay: 280 } },
   { id: 'dress',     label: 'Dresses',     one: 'Dress',     z: 3, box: { cx: 150, w: 190, h: 420, anchor: 'top',    ay: 148 } },
   { id: 'outerwear', label: 'Outerwear',   one: 'Jacket',    z: 4, box: { cx: 150, w: 210, h: 320, anchor: 'top',    ay: 144 } },
-  { id: 'shoes',     label: 'Shoes',       one: 'Shoes',     z: 1, box: { cx: 150, w: 120, h: 60,  anchor: 'bottom', ay: 586 } },
-  { id: 'hat',       label: 'Hats',        one: 'Hat',       z: 6, box: { cx: 150, w: 120, h: 64,  anchor: 'bottom', ay: 62  } },
+  { id: 'shoes',     label: 'Shoes',       one: 'Shoes',     z: 1, box: { cx: 150, w: 96,  h: 50,  anchor: 'bottom', ay: 588 } },
+  { id: 'hat',       label: 'Hats',        one: 'Hat',       z: 6, box: { cx: 150, w: 116, h: 60,  anchor: 'bottom', ay: 58  } },
   { id: 'accessory', label: 'Accessories', one: 'Accessory', z: 5, box: { cx: 150, w: 90,  h: 90,  anchor: 'center', ay: 210 } },
 ];
 const CAT = Object.fromEntries(CATEGORIES.map(c => [c.id, c]));
